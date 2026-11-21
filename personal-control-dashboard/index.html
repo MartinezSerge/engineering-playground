@@ -436,7 +436,7 @@
         await signInWithEmailAndPassword(auth, email, pass);
         document.getElementById("loginPass").value = "";
       } catch (err) {
-        loginError.textContent = "Credenciales incorrectas o usuario no autorizado.";
+        loginError.textContent = `${err.code}: ${err.message}`;
       } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = "Entrar al Dashboard";
