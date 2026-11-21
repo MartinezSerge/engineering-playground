@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Control Personal</title>
+
+  <!-- Configuración PWA para iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Control" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f172a'/><text x='50' y='66' font-size='52' text-anchor='middle' fill='%2338bdf8'>🛡️</text></svg>" />
+
+  <style>
+    :root {
+      --bg: #f2f2f7;
+      --card: #ffffff;
+      --text: #1c1c1e;
+      --subtext: #6e6e73;
+      --border: #e5e5ea;
+      --accent: #007aff;
+      --success: #34c759;
+      --warning: #ff9500;
+      --danger: #ff3b30;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --card: #1c1c1e;
+        --text: #f2f2f7;
+        --subtext: #8e8e93;
+        --border: #2c2c2e;
+        --accent: #0a84ff;
+        --success: #30d158;
+        --warning: #ff9f0a;
+        --danger: #ff453a;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 32px);
+      max-width: 600px;
+      margin-inline: auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      gap: 8px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.5px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sync-badge {
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--subtext);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .logout-btn {
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--danger);
+      font-weight: 600;
+      display: none;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--warning);
+    }
+
+    .dot.live { background: var(--success); }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--subtext);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .progress-wrap {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color: var(--subtext);
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.25s ease;
+    }
+
+    .section {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .task-item:first-of-type { border-top: none; }
+
+    .checkbox {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+      transition: 0.15s;
+    }
+
+    .task-item.done .checkbox {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    .task-item.done .task-text {
+      text-decoration: line-through;
+      color: var(--subtext);
+    }
+
+    .task-text {
+      font-size: 15px;
+      line-height: 1.35;
+      flex: 1;
+    }
+
+    .add-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    input {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+      flex: 1;
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .sub-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      font-size: 15px;
+    }
+
+    .sub-row:first-of-type { border-top: none; }
+
+    .del-btn {
+      background: transparent;
+      color: var(--danger);
+      padding: 4px 8px;
+      font-size: 13px;
+    }
+
+    .radar-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      margin: 4px 4px 0 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>Mi Control</h1>
+      <div style="font-size:13px; color:var(--subtext);">Seguridad • Recursos • Anti-FOMO</div>
+    </div>
+    <div class="header-actions">
+      <div class="sync-badge">
+        <span id="syncDot" class="dot"></span>
+        <span id="syncText">Verificando...</span>
+      </div>
+      <button id="logoutBtn" class="logout-btn" type="button" onclick="logoutUser()">Salir</button>
+    </div>
+  </header>
+
+  <!-- PANTALLA DE INICIO DE SESIÓN -->
+  <div id="authBox" class="section" style="display:none;">
+    <div class="section-title">
+      <span>Acceso Privado</span>
+    </div>
+    <p style="font-size:13px; color:var(--subtext); margin-top:0; line-height:1.4;">
+      Inicia sesión con tu cuenta autorizada en Firebase Authentication para desbloquear y sincronizar tu tablero.
+    </p>
+    <form id="loginForm" style="display:flex; flex-direction:column; gap:10px;">
+      <input id="loginEmail" type="email" placeholder="Correo electrónico" autocomplete="username" required />
+      <input id="loginPass" type="password" placeholder="Contraseña" autocomplete="current-password" required />
+      <button id="loginBtn" type="submit">Entrar al Dashboard</button>
+      <div id="loginError" style="font-size:12px; color:var(--danger); min-height:16px;"></div>
+    </form>
+  </div>
+
+  <!-- CONTENIDO DEL DASHBOARD (SOLO VISIBLE CON SESIÓN ACTIVA) -->
+  <main id="dashboardContent" style="display:none;">
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="stat-label">Avance</div>
+        <div class="stat-value" id="statProgress">0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Suscripciones</div>
+        <div class="stat-value" id="statSubs">$0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Radar</div>
+        <div class="stat-value" id="statRadar">0/3</div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span>Progreso del plan base</span>
+        <span id="progressCount">0 de 6</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 1: CHECKLIST -->
+    <div class="section">
+      <div class="section-title">
+        <span>Acciones Prioritarias</span>
+      </div>
+      <div id="taskList"></div>
+      <div class="add-row">
+        <input id="newTaskInput" type="text" placeholder="Nueva acción de control..." />
+        <button type="button" onclick="addTask()">+</button>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 2: SUSCRIPCIONES -->
+    <div class="section">
+      <div class="section-title">
+        <span>Suscripciones Activas (Mensual)</span>
+      </div>
+      <div id="subList"></div>
+      <div class="add-row">
+        <input id="subNameInput" type="text" placeholder="Ej. Streaming, App..." />
+        <input id="subCostInput" type="number" placeholder="Costo" style="max-width: 95px;" />
+        <button type="button" onclick="addSub()">+</button>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 3: RADAR ANTI-FOMO -->
+    <div class="section">
+      <div class="section-title">
+        <span>Mi Radar (Máx. 3 temas clave)</span>
+      </div>
+      <div id="radarList"></div>
+      <div class="add-row">
+        <input id="radarInput" type="text" placeholder="Ej. IA aplicada, Finanzas..." />
+        <button type="button" onclick="addRadar()">+</button>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBtGC5y2arBaC5L8IqKJzyYAAVWqNm3XeQ",
+      authDomain: "personaldashboard-39e21.firebaseapp.com",
+      databaseURL: "https://personaldashboard-39e21-default-rtdb.firebaseio.com",
+      projectId: "personaldashboard-39e21",
+      storageBucket: "personaldashboard-39e21.firebasestorage.app",
+      messagingSenderId: "1075343967468",
+      appId: "1:1075343967468:web:29c82b4a6d920e664811c9",
+      measurementId: "G-ZZ91QFN9XZ"
+    };
+
+    const defaultState = {
+      tasks: [
+        { id: "1", text: "Activar verificación en dos pasos (2FA) en correo principal y bancos", done: false },
+        { id: "2", text: "Revisar y revocar permisos de apps de terceros en Google", done: false },
+        { id: "3", text: "Revisar permisos de privacidad y actividad guardada en Google", done: false },
+        { id: "4", text: "Auditar extracto bancario y recibos en Gmail para listar suscripciones", done: false },
+        { id: "5", text: "Cancelar al menos una suscripción o servicio recurrente sin uso", done: false },
+        { id: "6", text: "Definir mis 3 temas clave para resúmenes semanales sin ruido", done: false }
+      ],
+      subs: [],
+      radar: ["IA práctica", "Seguridad digital"]
+    };
+
+    let state = JSON.parse(localStorage.getItem("sergio_dashboard_v1")) || defaultState;
+    let dbRef = null;
+    let unsubscribeDb = null;
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    const authBox = document.getElementById("authBox");
+    const dashboardContent = document.getElementById("dashboardContent");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const loginForm = document.getElementById("loginForm");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginError = document.getElementById("loginError");
+    const syncDot = document.getElementById("syncDot");
+    const syncText = document.getElementById("syncText");
+
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("loginEmail").value.trim();
+      const pass = document.getElementById("loginPass").value;
+      loginError.textContent = "";
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Verificando...";
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        document.getElementById("loginPass").value = "";
+      } catch (err) {
+        loginError.textContent = "Credenciales incorrectas o usuario no autorizado.";
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Entrar al Dashboard";
+      }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (unsubscribeDb) {
+        unsubscribeDb();
+        unsubscribeDb = null;
+      }
+
+      if (user) {
+        authBox.style.display = "none";
+        dashboardContent.style.display = "block";
+        logoutBtn.style.display = "inline-block";
+
+        dbRef = ref(db, "dashboards/sergio_principal");
+        syncText.textContent = "Conectando...";
+
+        unsubscribeDb = onValue(dbRef, (snapshot) => {
+          const remote = snapshot.val();
+          if (remote) {
+            state = {
+              tasks: remote.tasks || [],
+              subs: remote.subs || [],
+              radar: remote.radar || []
+            };
+            localStorage.setItem("sergio_dashboard_v1", JSON.stringify(state));
+            render();
+          } else {
+            set(dbRef, state);
+          }
+          syncDot.classList.add("live");
+          syncText.textContent = "En vivo";
+        }, () => {
+          syncDot.classList.remove("live");
+          syncText.textContent = "Sin permiso";
+        });
+      } else {
+        dbRef = null;
+        dashboardContent.style.display = "none";
+        logoutBtn.style.display = "none";
+        authBox.style.display = "block";
+        syncDot.classList.remove("live");
+        syncText.textContent = "Bloqueado";
+      }
+    });
+
+    function saveState() {
+      localStorage.setItem("sergio_dashboard_v1", JSON.stringify(state));
+      if (dbRef && auth.currentUser) {
+        set(dbRef, state);
+      }
+      render();
+    }
+
+    window.toggleTask = (id) => {
+      state.tasks = state.tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
+      saveState();
+    };
+
+    window.addTask = () => {
+      const input = document.getElementById("newTaskInput");
+      if (!input.value.trim()) return;
+      state.tasks.push({ id: Date.now().toString(), text: input.value.trim(), done: false });
+      input.value = "";
+      saveState();
+    };
+
+    window.addSub = () => {
+      const name = document.getElementById("subNameInput");
+      const cost = document.getElementById("subCostInput");
+      if (!name.value.trim() || !cost.value) return;
+      state.subs.push({ id: Date.now().toString(), name: name.value.trim(), cost: parseFloat(cost.value) });
+      name.value = "";
+      cost.value = "";
+      saveState();
+    };
+
+    window.removeSub = (id) => {
+      state.subs = state.subs.filter(s => s.id !== id);
+      saveState();
+    };
+
+    window.addRadar = () => {
+      const input = document.getElementById("radarInput");
+      if (!input.value.trim() || state.radar.length >= 3) return;
+      state.radar.push(input.value.trim());
+      input.value = "";
+      saveState();
+    };
+
+    window.removeRadar = (idx) => {
+      state.radar.splice(idx, 1);
+      saveState();
+    };
+
+    window.logoutUser = () => signOut(auth);
+
+    function render() {
+      const taskList = document.getElementById("taskList");
+      taskList.innerHTML = state.tasks.map(t => `
+        <div class="task-item ${t.done ? "done" : ""}" onclick="toggleTask('${t.id}')">
+          <div class="checkbox">${t.done ? "✓" : ""}</div>
+          <div class="task-text">${t.text}</div>
+        </div>
+      `).join("");
+
+      const doneCount = state.tasks.filter(t => t.done).length;
+      const total = state.tasks.length;
+      const pct = total ? Math.round((doneCount / total) * 100) : 0;
+
+      document.getElementById("statProgress").textContent = `${pct}%`;
+      document.getElementById("progressCount").textContent = `${doneCount} de ${total}`;
+      document.getElementById("progressFill").style.width = `${pct}%`;
+
+      const subList = document.getElementById("subList");
+      const totalSubs = state.subs.reduce((acc, s) => acc + s.cost, 0);
+      document.getElementById("statSubs").textContent = `$${totalSubs.toLocaleString()}`;
+
+      subList.innerHTML = state.subs.length
+        ? state.subs.map(s => `
+            <div class="sub-row">
+              <span>${s.name}</span>
+              <div>
+                <strong>$${s.cost.toLocaleString()}</strong>
+                <button class="del-btn" type="button" onclick="removeSub('${s.id}')">✕</button>
+              </div>
+            </div>
+          `).join("")
+        : `<div style="font-size:13px; color:var(--subtext);">Sin suscripciones registradas aún.</div>`;
+
+      const radarList = document.getElementById("radarList");
+      document.getElementById("statRadar").textContent = `${state.radar.length}/3`;
+      radarList.innerHTML = state.radar.map((topic, i) => `
+        <span class="radar-tag">${topic} <strong style="cursor:pointer; color:var(--danger);" onclick="removeRadar(${i})">×</strong></span>
+      `).join("");
+    }
+
+    render();
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  </script>
+</body>
+</html>
