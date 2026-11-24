@@ -61,13 +61,29 @@
       align-items: center;
       margin-bottom: 18px;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     h1 {
       font-size: 28px;
       font-weight: 700;
       margin: 0;
       letter-spacing: -0.5px;
+    }
+
+    .version-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--accent);
     }
 
     .header-actions {
@@ -250,6 +266,15 @@
       cursor: pointer;
     }
 
+    .danger-btn {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 10px;
+    }
+
     .sub-row {
       display: flex;
       justify-content: space-between;
@@ -279,13 +304,24 @@
       font-size: 13px;
       margin: 4px 4px 0 0;
     }
+
+    .security-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 <body>
 
   <header>
     <div>
-      <h1>Mi Control</h1>
+      <div class="title-row">
+        <h1>Mi Control</h1>
+        <span class="version-badge">v1.1.0</span>
+      </div>
       <div style="font-size:13px; color:var(--subtext);">Seguridad • Recursos • Anti-FOMO</div>
     </div>
     <div class="header-actions">
@@ -303,7 +339,7 @@
       <span>Acceso Privado</span>
     </div>
     <p style="font-size:13px; color:var(--subtext); margin-top:0; line-height:1.4;">
-      Inicia sesión con tu cuenta autorizada en Firebase Authentication para desbloquear y sincronizar tu tablero.
+      Inicia sesión con tu cuenta en Firebase Authentication para acceder a tu espacio aislado (<code>users/$uid/dashboard</code>).
     </p>
     <form id="loginForm" style="display:flex; flex-direction:column; gap:10px;">
       <input id="loginEmail" type="email" placeholder="Correo electrónico" autocomplete="username" required />
@@ -376,11 +412,25 @@
         <button type="button" onclick="addRadar()">+</button>
       </div>
     </div>
+
+    <!-- SECCIÓN 4: PRIVACIDAD Y BORRADO DE DATOS (ISO/IEC 27001 A.5.28 / A.8.12) -->
+    <div class="section">
+      <div class="section-title">
+        <span>Privacidad y Datos</span>
+      </div>
+      <div class="security-footer">
+        <div style="font-size:13px; color:var(--subtext); line-height:1.4; max-width:360px;">
+          Elimina de forma permanente tus datos guardados en la nube y en este dispositivo.
+        </div>
+        <button id="purgeBtn" class="danger-btn" type="button" onclick="purgeUserData()">Borrar mis datos</button>
+      </div>
+      <div id="securityStatus" style="font-size:12px; color:var(--subtext); margin-top:8px; min-height:16px;"></div>
+    </div>
   </main>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     const firebaseConfig = {
@@ -394,21 +444,34 @@
       measurementId: "G-ZZ91QFN9XZ"
     };
 
-    const defaultState = {
-      tasks: [
-        { id: "1", text: "Activar verificación en dos pasos (2FA) en correo principal y bancos", done: false },
-        { id: "2", text: "Revisar y revocar permisos de apps de terceros en Google", done: false },
-        { id: "3", text: "Revisar permisos de privacidad y actividad guardada en Google", done: false },
-        { id: "4", text: "Auditar extracto bancario y recibos en Gmail para listar suscripciones", done: false },
-        { id: "5", text: "Cancelar al menos una suscripción o servicio recurrente sin uso", done: false },
-        { id: "6", text: "Definir mis 3 temas clave para resúmenes semanales sin ruido", done: false }
-      ],
-      subs: [],
-      radar: ["IA práctica", "Seguridad digital"]
-    };
+    const STORAGE_KEY = "sergio_dashboard_v1";
 
-    let state = JSON.parse(localStorage.getItem("sergio_dashboard_v1")) || defaultState;
-    let dbRef = null;
+    function createDefaultState() {
+      return {
+        tasks: [
+          { id: "1", text: "Activar verificación en dos pasos (2FA) en correo principal y bancos", done: false },
+          { id: "2", text: "Revisar y revocar permisos de apps de terceros en Google", done: false },
+          { id: "3", text: "Revisar permisos de privacidad y actividad guardada en Google", done: false },
+          { id: "4", text: "Auditar extracto bancario y recibos en Gmail para listar suscripciones", done: false },
+          { id: "5", text: "Cancelar al menos una suscripción o servicio recurrente sin uso", done: false },
+          { id: "6", text: "Definir mis 3 temas clave para resúmenes semanales sin ruido", done: false }
+        ],
+        subs: [],
+        radar: ["IA práctica", "Seguridad digital"]
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    let state = createDefaultState();
+    let currentUserRef = null;
     let unsubscribeDb = null;
 
     const app = initializeApp(firebaseConfig);
@@ -423,6 +486,16 @@
     const loginError = document.getElementById("loginError");
     const syncDot = document.getElementById("syncDot");
     const syncText = document.getElementById("syncText");
+    const securityStatus = document.getElementById("securityStatus");
+
+    function getUserDashboardPath(uid) {
+      return `users/${uid}/dashboard`;
+    }
+
+    function clearLocalSessionData() {
+      localStorage.removeItem(STORAGE_KEY);
+      state = createDefaultState();
+    }
 
     loginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -453,22 +526,28 @@
         authBox.style.display = "none";
         dashboardContent.style.display = "block";
         logoutBtn.style.display = "inline-block";
+        securityStatus.textContent = "";
 
-        dbRef = ref(db, "dashboards/sergio_principal");
+        currentUserRef = ref(db, getUserDashboardPath(user.uid));
         syncText.textContent = "Conectando...";
 
-        unsubscribeDb = onValue(dbRef, (snapshot) => {
+        unsubscribeDb = onValue(currentUserRef, (snapshot) => {
+          if (!auth.currentUser || auth.currentUser.uid !== user.uid) return;
           const remote = snapshot.val();
           if (remote) {
             state = {
-              tasks: remote.tasks || [],
-              subs: remote.subs || [],
-              radar: remote.radar || []
+              tasks: Array.isArray(remote.tasks) ? remote.tasks : [],
+              subs: Array.isArray(remote.subs) ? remote.subs : [],
+              radar: Array.isArray(remote.radar) ? remote.radar : []
             };
-            localStorage.setItem("sergio_dashboard_v1", JSON.stringify(state));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
             render();
           } else {
-            set(dbRef, state);
+            const initialData = createDefaultState();
+            state = initialData;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            set(currentUserRef, initialData);
+            render();
           }
           syncDot.classList.add("live");
           syncText.textContent = "En vivo";
@@ -477,7 +556,9 @@
           syncText.textContent = "Sin permiso";
         });
       } else {
-        dbRef = null;
+        currentUserRef = null;
+        clearLocalSessionData();
+        render();
         dashboardContent.style.display = "none";
         logoutBtn.style.display = "none";
         authBox.style.display = "block";
@@ -487,10 +568,9 @@
     });
 
     function saveState() {
-      localStorage.setItem("sergio_dashboard_v1", JSON.stringify(state));
-      if (dbRef && auth.currentUser) {
-        set(dbRef, state);
-      }
+      if (!auth.currentUser || !currentUserRef) return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      set(currentUserRef, state);
       render();
     }
 
@@ -501,8 +581,9 @@
 
     window.addTask = () => {
       const input = document.getElementById("newTaskInput");
-      if (!input.value.trim()) return;
-      state.tasks.push({ id: Date.now().toString(), text: input.value.trim(), done: false });
+      const text = input.value.trim();
+      if (!text) return;
+      state.tasks.push({ id: Date.now().toString(), text, done: false });
       input.value = "";
       saveState();
     };
@@ -510,8 +591,9 @@
     window.addSub = () => {
       const name = document.getElementById("subNameInput");
       const cost = document.getElementById("subCostInput");
-      if (!name.value.trim() || !cost.value) return;
-      state.subs.push({ id: Date.now().toString(), name: name.value.trim(), cost: parseFloat(cost.value) });
+      const parsedCost = parseFloat(cost.value);
+      if (!name.value.trim() || Number.isNaN(parsedCost) || parsedCost < 0) return;
+      state.subs.push({ id: Date.now().toString(), name: name.value.trim(), cost: parsedCost });
       name.value = "";
       cost.value = "";
       saveState();
@@ -524,8 +606,9 @@
 
     window.addRadar = () => {
       const input = document.getElementById("radarInput");
-      if (!input.value.trim() || state.radar.length >= 3) return;
-      state.radar.push(input.value.trim());
+      const topic = input.value.trim();
+      if (!topic || state.radar.length >= 3) return;
+      state.radar.push(topic);
       input.value = "";
       saveState();
     };
@@ -535,14 +618,34 @@
       saveState();
     };
 
-    window.logoutUser = () => signOut(auth);
+    window.purgeUserData = async () => {
+      if (!auth.currentUser || !currentUserRef) return;
+      const confirmed = window.confirm("¿Seguro que deseas borrar permanentemente tus datos en la nube y en este dispositivo?");
+      if (!confirmed) return;
+
+      securityStatus.textContent = "Eliminando datos...";
+      try {
+        await remove(currentUserRef);
+        clearLocalSessionData();
+        render();
+        securityStatus.textContent = "Datos eliminados y restablecidos.";
+      } catch (err) {
+        securityStatus.textContent = `No se pudieron borrar los datos (${err.code || "error"}).`;
+      }
+    };
+
+    window.logoutUser = async () => {
+      clearLocalSessionData();
+      render();
+      await signOut(auth);
+    };
 
     function render() {
       const taskList = document.getElementById("taskList");
       taskList.innerHTML = state.tasks.map(t => `
-        <div class="task-item ${t.done ? "done" : ""}" onclick="toggleTask('${t.id}')">
+        <div class="task-item ${t.done ? "done" : ""}" onclick="toggleTask('${escapeHtml(t.id)}')">
           <div class="checkbox">${t.done ? "✓" : ""}</div>
-          <div class="task-text">${t.text}</div>
+          <div class="task-text">${escapeHtml(t.text)}</div>
         </div>
       `).join("");
 
@@ -555,16 +658,16 @@
       document.getElementById("progressFill").style.width = `${pct}%`;
 
       const subList = document.getElementById("subList");
-      const totalSubs = state.subs.reduce((acc, s) => acc + s.cost, 0);
+      const totalSubs = state.subs.reduce((acc, s) => acc + (Number(s.cost) || 0), 0);
       document.getElementById("statSubs").textContent = `$${totalSubs.toLocaleString()}`;
 
       subList.innerHTML = state.subs.length
         ? state.subs.map(s => `
             <div class="sub-row">
-              <span>${s.name}</span>
+              <span>${escapeHtml(s.name)}</span>
               <div>
-                <strong>$${s.cost.toLocaleString()}</strong>
-                <button class="del-btn" type="button" onclick="removeSub('${s.id}')">✕</button>
+                <strong>$${(Number(s.cost) || 0).toLocaleString()}</strong>
+                <button class="del-btn" type="button" onclick="removeSub('${escapeHtml(s.id)}')">✕</button>
               </div>
             </div>
           `).join("")
@@ -573,7 +676,7 @@
       const radarList = document.getElementById("radarList");
       document.getElementById("statRadar").textContent = `${state.radar.length}/3`;
       radarList.innerHTML = state.radar.map((topic, i) => `
-        <span class="radar-tag">${topic} <strong style="cursor:pointer; color:var(--danger);" onclick="removeRadar(${i})">×</strong></span>
+        <span class="radar-tag">${escapeHtml(topic)} <strong style="cursor:pointer; color:var(--danger);" onclick="removeRadar(${i})">×</strong></span>
       `).join("");
     }
 
