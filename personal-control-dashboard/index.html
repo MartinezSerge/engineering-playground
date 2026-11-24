@@ -69,6 +69,7 @@
       align-items: center;
       gap: 8px;
     }
+
     h1 {
       font-size: 28px;
       font-weight: 700;
@@ -305,6 +306,12 @@
       margin: 4px 4px 0 0;
     }
 
+    .radar-remove {
+      cursor: pointer;
+      color: var(--danger);
+      font-weight: 700;
+    }
+
     .security-footer {
       display: flex;
       justify-content: space-between;
@@ -329,7 +336,7 @@
         <span id="syncDot" class="dot"></span>
         <span id="syncText">Verificando...</span>
       </div>
-      <button id="logoutBtn" class="logout-btn" type="button" onclick="logoutUser()">Salir</button>
+      <button id="logoutBtn" class="logout-btn" type="button">Salir</button>
     </div>
   </header>
 
@@ -384,7 +391,7 @@
       <div id="taskList"></div>
       <div class="add-row">
         <input id="newTaskInput" type="text" placeholder="Nueva acción de control..." />
-        <button type="button" onclick="addTask()">+</button>
+        <button id="addTaskBtn" type="button">+</button>
       </div>
     </div>
 
@@ -397,7 +404,7 @@
       <div class="add-row">
         <input id="subNameInput" type="text" placeholder="Ej. Streaming, App..." />
         <input id="subCostInput" type="number" placeholder="Costo" style="max-width: 95px;" />
-        <button type="button" onclick="addSub()">+</button>
+        <button id="addSubBtn" type="button">+</button>
       </div>
     </div>
 
@@ -409,7 +416,7 @@
       <div id="radarList"></div>
       <div class="add-row">
         <input id="radarInput" type="text" placeholder="Ej. IA aplicada, Finanzas..." />
-        <button type="button" onclick="addRadar()">+</button>
+        <button id="addRadarBtn" type="button">+</button>
       </div>
     </div>
 
@@ -422,7 +429,7 @@
         <div style="font-size:13px; color:var(--subtext); line-height:1.4; max-width:360px;">
           Elimina de forma permanente tus datos guardados en la nube y en este dispositivo.
         </div>
-        <button id="purgeBtn" class="danger-btn" type="button" onclick="purgeUserData()">Borrar mis datos</button>
+        <button id="purgeBtn" class="danger-btn" type="button">Borrar mis datos</button>
       </div>
       <div id="securityStatus" style="font-size:12px; color:var(--subtext); margin-top:8px; min-height:16px;"></div>
     </div>
@@ -461,6 +468,10 @@
       };
     }
 
+    function createEmptyState() {
+      return { tasks: [], subs: [], radar: [] };
+    }
+
     function escapeHtml(value) {
       return String(value ?? "")
         .replace(/&/g, "&amp;")
@@ -473,6 +484,7 @@
     let state = createDefaultState();
     let currentUserRef = null;
     let unsubscribeDb = null;
+    let skipNextEmptySeed = false;
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -487,6 +499,10 @@
     const syncDot = document.getElementById("syncDot");
     const syncText = document.getElementById("syncText");
     const securityStatus = document.getElementById("securityStatus");
+    const taskList = document.getElementById("taskList");
+    const subList = document.getElementById("subList");
+    const radarList = document.getElementById("radarList");
+    const purgeBtn = document.getElementById("purgeBtn");
 
     function getUserDashboardPath(uid) {
       return `users/${uid}/dashboard`;
@@ -521,6 +537,7 @@
         unsubscribeDb();
         unsubscribeDb = null;
       }
+      skipNextEmptySeed = false;
 
       if (user) {
         authBox.style.display = "none";
@@ -535,12 +552,18 @@
           if (!auth.currentUser || auth.currentUser.uid !== user.uid) return;
           const remote = snapshot.val();
           if (remote) {
+            skipNextEmptySeed = false;
             state = {
               tasks: Array.isArray(remote.tasks) ? remote.tasks : [],
               subs: Array.isArray(remote.subs) ? remote.subs : [],
               radar: Array.isArray(remote.radar) ? remote.radar : []
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            render();
+          } else if (skipNextEmptySeed) {
+            skipNextEmptySeed = false;
+            state = createEmptyState();
+            localStorage.removeItem(STORAGE_KEY);
             render();
           } else {
             const initialData = createDefaultState();
@@ -574,21 +597,21 @@
       render();
     }
 
-    window.toggleTask = (id) => {
+    function toggleTask(id) {
       state.tasks = state.tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
       saveState();
-    };
+    }
 
-    window.addTask = () => {
+    function addTask() {
       const input = document.getElementById("newTaskInput");
       const text = input.value.trim();
       if (!text) return;
       state.tasks.push({ id: Date.now().toString(), text, done: false });
       input.value = "";
       saveState();
-    };
+    }
 
-    window.addSub = () => {
+    function addSub() {
       const name = document.getElementById("subNameInput");
       const cost = document.getElementById("subCostInput");
       const parsedCost = parseFloat(cost.value);
@@ -597,53 +620,85 @@
       name.value = "";
       cost.value = "";
       saveState();
-    };
+    }
 
-    window.removeSub = (id) => {
+    function removeSub(id) {
       state.subs = state.subs.filter(s => s.id !== id);
       saveState();
-    };
+    }
 
-    window.addRadar = () => {
+    function addRadar() {
       const input = document.getElementById("radarInput");
       const topic = input.value.trim();
       if (!topic || state.radar.length >= 3) return;
       state.radar.push(topic);
       input.value = "";
       saveState();
-    };
+    }
 
-    window.removeRadar = (idx) => {
+    function removeRadar(idx) {
+      if (Number.isNaN(idx) || idx < 0 || idx >= state.radar.length) return;
       state.radar.splice(idx, 1);
       saveState();
-    };
+    }
 
-    window.purgeUserData = async () => {
+    async function purgeUserData() {
       if (!auth.currentUser || !currentUserRef) return;
       const confirmed = window.confirm("¿Seguro que deseas borrar permanentemente tus datos en la nube y en este dispositivo?");
       if (!confirmed) return;
 
+      purgeBtn.disabled = true;
       securityStatus.textContent = "Eliminando datos...";
+      skipNextEmptySeed = true;
+
       try {
         await remove(currentUserRef);
-        clearLocalSessionData();
+        localStorage.removeItem(STORAGE_KEY);
+        state = createEmptyState();
         render();
         securityStatus.textContent = "Datos eliminados y restablecidos.";
       } catch (err) {
+        skipNextEmptySeed = false;
         securityStatus.textContent = `No se pudieron borrar los datos (${err.code || "error"}).`;
+      } finally {
+        purgeBtn.disabled = false;
       }
-    };
+    }
 
-    window.logoutUser = async () => {
+    async function logoutUser() {
       clearLocalSessionData();
       render();
       await signOut(auth);
-    };
+    }
+
+    document.getElementById("addTaskBtn").addEventListener("click", addTask);
+    document.getElementById("addSubBtn").addEventListener("click", addSub);
+    document.getElementById("addRadarBtn").addEventListener("click", addRadar);
+    purgeBtn.addEventListener("click", purgeUserData);
+    logoutBtn.addEventListener("click", logoutUser);
+
+    taskList.addEventListener("click", (e) => {
+      const item = e.target.closest(".task-item");
+      if (!item || !item.dataset.id) return;
+      toggleTask(item.dataset.id);
+    });
+
+    subList.addEventListener("click", (e) => {
+      const btn = e.target.closest(".del-btn");
+      if (!btn || !btn.dataset.id) return;
+      removeSub(btn.dataset.id);
+    });
+
+    radarList.addEventListener("click", (e) => {
+      const remover = e.target.closest(".radar-remove");
+      if (!remover) return;
+      const idx = Number.parseInt(remover.dataset.index, 10);
+      removeRadar(idx);
+    });
 
     function render() {
-      const taskList = document.getElementById("taskList");
       taskList.innerHTML = state.tasks.map(t => `
-        <div class="task-item ${t.done ? "done" : ""}" onclick="toggleTask('${escapeHtml(t.id)}')">
+        <div class="task-item ${t.done ? "done" : ""}" data-id="${escapeHtml(t.id)}">
           <div class="checkbox">${t.done ? "✓" : ""}</div>
           <div class="task-text">${escapeHtml(t.text)}</div>
         </div>
@@ -657,7 +712,6 @@
       document.getElementById("progressCount").textContent = `${doneCount} de ${total}`;
       document.getElementById("progressFill").style.width = `${pct}%`;
 
-      const subList = document.getElementById("subList");
       const totalSubs = state.subs.reduce((acc, s) => acc + (Number(s.cost) || 0), 0);
       document.getElementById("statSubs").textContent = `$${totalSubs.toLocaleString()}`;
 
@@ -667,16 +721,15 @@
               <span>${escapeHtml(s.name)}</span>
               <div>
                 <strong>$${(Number(s.cost) || 0).toLocaleString()}</strong>
-                <button class="del-btn" type="button" onclick="removeSub('${escapeHtml(s.id)}')">✕</button>
+                <button class="del-btn" type="button" data-id="${escapeHtml(s.id)}">✕</button>
               </div>
             </div>
           `).join("")
         : `<div style="font-size:13px; color:var(--subtext);">Sin suscripciones registradas aún.</div>`;
 
-      const radarList = document.getElementById("radarList");
       document.getElementById("statRadar").textContent = `${state.radar.length}/3`;
       radarList.innerHTML = state.radar.map((topic, i) => `
-        <span class="radar-tag">${escapeHtml(topic)} <strong style="cursor:pointer; color:var(--danger);" onclick="removeRadar(${i})">×</strong></span>
+        <span class="radar-tag">${escapeHtml(topic)} <span class="radar-remove" data-index="${i}">×</span></span>
       `).join("");
     }
 
